@@ -1,5 +1,5 @@
 use typedb_driver::{
-    answer::ConceptMap, concept::{Attribute}, Connection, DatabaseManager, Error, Options, Promise, Session, SessionType, TransactionType
+    concept::{Attribute, Concept, Value}, Connection, DatabaseManager, Error, Options, Promise, Session, SessionType, TransactionType
 };
 
 fn main() -> Result<(), Error> {
@@ -101,7 +101,7 @@ fn main() -> Result<(), Error> {
                                 delete
                                 $f isa friendship;
                                 ";
-        tx.query().delete(delete_query).resolve();
+        let _ = tx.query().delete(delete_query).resolve();
         tx.commit().resolve()?;       
     }
 
@@ -123,6 +123,78 @@ fn main() -> Result<(), Error> {
         } else {
             tx.force_close(); 
         }     
+    }
+
+    {
+        let db = databases.get(DB_NAME)?;
+        let session = Session::new(db, SessionType::Data)?;
+        let tx = session.transaction(TransactionType::Read)?;
+        let fetch_query = "
+                                match
+                                $u isa user;
+                                fetch
+                                $u: name, email;
+                                ";
+        let response = tx.query().fetch(fetch_query)?;
+        for (i, json) in response.enumerate() {
+            println!("User #{}: {}", (i + 1).to_string(), json.unwrap().to_string())
+        }
+    }
+
+    {
+        let db = databases.get(DB_NAME)?;
+        let session = Session::new(db, SessionType::Data)?;
+        let tx = session.transaction(TransactionType::Read)?;
+        let get_query = "
+                                match
+                                $u isa user, has email $e;
+                                get
+                                $e;
+                                ";
+        let response = tx.query().get(get_query)?;
+        for (i, cm) in response.enumerate() {
+            let email_concept = cm.unwrap().get("e").unwrap().clone();
+            let email = match email_concept {
+                Concept::Attribute(Attribute {
+                    value: Value::String(value),
+                    ..
+                }) => value,
+                _ => unreachable!(),
+            };
+            println!("Email #{}: {}", (i + 1).to_string(), email)
+        }
+    }
+
+    {
+        let db = databases.get(DB_NAME)?;
+        let session = Session::new(db, SessionType::Schema)?;
+        let tx = session.transaction(TransactionType::Write)?;
+        let define_query = "
+                                define
+                                rule users:
+                                when {
+                                    $u isa user;
+                                } then {
+                                    $u has name 'User';
+                                };
+                                ";
+        tx.query().define(define_query).resolve()?;
+        tx.commit().resolve()?;
+
+        let db = databases.get(DB_NAME)?;
+        let options = Options::new().infer(true);
+        let session = Session::new(db, SessionType::Data)?;
+        let tx = session.transaction_with_options(TransactionType::Read, options)?;
+        let fetch_query = "
+                                match
+                                $u isa user;
+                                fetch
+                                $u: name, email;
+                                ";
+        let response = tx.query().fetch(fetch_query)?;
+        for (i, json) in response.enumerate() {
+            println!("User #{}: {}", (i + 1).to_string(), json.unwrap().to_string())
+        }
     }
 
     Ok({})
