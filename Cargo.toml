@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 typedb-driver = { version = "2.26.5", features = ["sync"] }
+typeql = "2.25.8"
