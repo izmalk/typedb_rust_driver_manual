@@ -303,17 +303,17 @@ fn main() -> Result<(), Error> {
             let session = Session::new(db, SessionType::Schema)?;
             {
                 let transaction = session.transaction(TransactionType::Write)?;
-                let rules = transaction.logic().get_rules()?;
-                for rule in rules {
-                    let r = rule?;
-                    println!("Rule label: {}", r.label);
-                    println!("  Condition: {}", r.when.to_string());
-                    println!("  Conclusion: {}", r.then.to_string());
-                }
+                let r = transaction.logic().get_rule("users".to_owned()).resolve()?.ok_or("Rule not found.").unwrap();
+                println!("Rule label: {}", r.label);
+                println!("  Condition: {}", r.when.to_string());
+                println!("  Conclusion: {}", r.then.to_string());
                 let condition = typeql::parse_pattern("{$u isa user, has email $e; $e contains '@vaticle.com';}")?.into_conjunction();
                 let conclusion = typeql::parse_pattern("$u has name 'Employee'")?.into_statement();
                 let mut new_rule = transaction.logic().put_rule("Employee".to_string(), condition, conclusion ).resolve()?;
-                println!("{}", transaction.logic().get_rule("Employee".to_owned()).resolve()?.ok_or("Rule not found.").unwrap().label);
+                let rules = transaction.logic().get_rules()?;
+                for rule in rules {
+                    println!("{}", rule?.label);
+                }
                 let _ = new_rule.delete(&transaction).resolve();
                 let _ = transaction.commit().resolve();
             }
