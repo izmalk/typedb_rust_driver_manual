@@ -383,19 +383,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             let session = Session::new(db, SessionType::Schema)?;
             {
                 let tx = session.transaction(TransactionType::Write)?;
-                let r = tx.logic().get_rule("users".to_owned()).resolve()?.ok_or("Rule not found.")?;
-                println!("Rule label: {}", r.label);
-                println!("  Condition: {}", r.when.to_string());
-                println!("  Conclusion: {}", r.then.to_string());
+                let rules = tx.logic().get_rules()?;
+                for rule in rules {
+                    println!("{}", rule.clone()?.label);
+                    println!("{}", rule.clone()?.when.to_string());
+                    println!("{}", rule.clone()?.then.to_string());
+                }
                 let condition = typeql::parse_pattern("{$u isa user, has email $e; $e contains '@vaticle.com';}")?
                     .into_conjunction();
                 let conclusion = typeql::parse_pattern("$u has name 'Employee'")?.into_statement();
                 let mut new_rule = tx.logic().put_rule("Employee".to_string(), condition, conclusion).resolve()?;
-                let rules = tx.logic().get_rules()?;
-                for rule in rules {
-                    println!("{}", rule?.label);
-                }
                 let _ = new_rule.delete(&tx).resolve();
+                let old_rule = tx.logic().get_rule("users".to_owned()).resolve()?.ok_or("Rule not found.")?;
                 let _ = tx.commit().resolve();
             }
         }
@@ -408,11 +407,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             {
                 let tx = session.transaction(TransactionType::Write)?;
                 // tag::get_rule[]
-                let r = tx.logic().get_rule("users".to_owned()).resolve()?.ok_or("Rule not found.")?;
+                let old_rule = tx.logic().get_rule("users".to_owned()).resolve()?.ok_or("Rule not found.")?;
                 // end::get_rule[]
-                println!("Rule label: {}", r.label);
-                println!("  Condition: {}", r.when.to_string());
-                println!("  Conclusion: {}", r.then.to_string());
                 // tag::put_rule[]
                 let condition = typeql::parse_pattern("{$u isa user, has email $e; $e contains '@vaticle.com';}")?
                     .into_conjunction();
@@ -422,7 +418,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // tag::get_rules[]
                 let rules = tx.logic().get_rules()?;
                 for rule in rules {
-                    println!("{}", rule?.label);
+                    println!("{}", rule.clone()?.label);
+                    println!("{}", rule.clone()?.when.to_string());
+                    println!("{}", rule.clone()?.then.to_string());
                 }
                 // end::get_rules[]
                 // tag::delete_rule[]
